@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
+    <style>
+      svg{
+          cursor: default;
+      }
+    </style>
+</head>
+<body>
+    <script>
+        let width = 1200;
+        let height = 675;
+        const projection = d3.geoMercator()
+            .center([120.24,23.18 ])
+            .scale(50000);
+        const svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+        let path = d3.geoPath()
+            .projection(projection);
+        const g = svg.append("g");
+        d3.json("taiwanDistrict.json")
+        .then(function(topology) {
+            const geojson =  topojson
+                        .feature(topology, topology.objects.TOWN_MOI_1100415)
+                        .features;
+            // console.log(geojson);
+            const tainanGeojson = [];
+            geojson.forEach(function(el) {
+                if(el.properties.COUNTYNAME=="臺南市"){
+                    tainanGeojson.push(el);
+                }
+            })
+            // console.log(tainanGeojson);
+         
+            d3.csv("taiwan109s4.csv")
+            .then(function(csvData){
+                console.log(csvData);
+                const districtMap = d3.group(csvData, d => d["鄉鎮市區"]);
+                console.log(districtMap);
+                tainanGeojson.forEach(function(el){
+                    for (let [key, value] of districtMap) {
+                        if(key===el.properties.TOWNNAME){
+                            el.properties.HOUSEPRICE= d3.mean(value, d=>d["單價元平方公尺"]);
+                        }
+                    }
+                });
+                const tainanGeojsonSort = d3.sort(tainanGeojson,d=>(d.properties.HOUSEPRICE));
+                console.log(tainanGeojsonSort);
+
+                let maxNum = d3.max(tainanGeojson,(d)=>(d.properties.HOUSEPRICE));
+                let minNum = d3.min(tainanGeojson,(d)=>(d.properties.HOUSEPRICE));
+                let redGreen = d3.scaleSequential(d3.interpolateRdYlGn).domain([maxNum, minNum]);
+                let temForToolTip = 0;
+                g.selectAll("path")
+                .data(tainanGeojsonSort)
+                .join("path")
+                .style('fill',"white")
+                .style("stroke", "black")
+                .style("stroke-width",".25")
+                .style("stroke-opacity",".5")
+                .attr("d", path)
+                .on("mouseenter",function(e){
+                    if(temForToolTip==1){
+                        return
+                    }
+                    let getTheDtName = d3.select(this).data()[0].properties.TOWNNAME;
+                    let getTheDtPrice = parseInt(d3.select(this).data()[0].properties.HOUSEPRICE);
+                    svg.append("g").attr("id","tooltip").html(`
+                    <rect rx="4" x="${e.x}" y="${e.y}" width="100" height="75" style="fill:darkblue;"></rect>
+                    <text font-weight="bold" style="fill:white;">
+                        <tspan x="${e.x+20}" y="${e.y+35}">${getTheDtName}</tspan>
+                        <tspan x="${e.x+20}" y="${e.y+55}">${getTheDtPrice}元</tspan>
+                        <tspan x="${e.x+45}" y="${e.y+70}" style="font-size:10px;">Avg:NT$/m²</tspan>
+                    </text>
+                    `)
+                    temForToolTip=1;
+                })
+                .on("mouseleave",function(e){
+                    svg.select("#tooltip").remove();
+                    temForToolTip=0;
+                  ;
+                })
+                .transition().delay((d,i)=>(i*100))
+                .style("fill",d=>(redGreen(d.properties.HOUSEPRICE)))
+               
+                ;
+            });
+        })
+    </script>
+</body>
+</html>
