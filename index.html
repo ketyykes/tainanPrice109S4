@@ -11,6 +11,9 @@
       svg{
           cursor: default;
       }
+      svg #tooltip{
+        pointer-events: none;
+      }
     </style>
 </head>
 <body>
@@ -23,7 +26,7 @@
         const svg = d3.select("body").append("svg")
             .attr("width", width)
             .attr("height", height);
-        let path = d3.geoPath()
+        const path = d3.geoPath()
             .projection(projection);
         const g = svg.append("g");
         d3.json("taiwanDistrict.json")
@@ -31,15 +34,12 @@
             const geojson =  topojson
                         .feature(topology, topology.objects.TOWN_MOI_1100415)
                         .features;
-            // console.log(geojson);
             const tainanGeojson = [];
             geojson.forEach(function(el) {
                 if(el.properties.COUNTYNAME=="臺南市"){
                     tainanGeojson.push(el);
                 }
             })
-            // console.log(tainanGeojson);
-         
             d3.csv("taiwan109s4.csv")
             .then(function(csvData){
                 console.log(csvData);
@@ -54,11 +54,10 @@
                 });
                 const tainanGeojsonSort = d3.sort(tainanGeojson,d=>(d.properties.HOUSEPRICE));
                 console.log(tainanGeojsonSort);
-
                 let maxNum = d3.max(tainanGeojson,(d)=>(d.properties.HOUSEPRICE));
                 let minNum = d3.min(tainanGeojson,(d)=>(d.properties.HOUSEPRICE));
-                let redGreen = d3.scaleSequential(d3.interpolateRdYlGn).domain([maxNum, minNum]);
-                let temForToolTip = 0;
+                const redGreen = d3.scaleSequential(d3.interpolateRdYlGn).domain([maxNum, minNum]);
+
                 g.selectAll("path")
                 .data(tainanGeojsonSort)
                 .join("path")
@@ -67,31 +66,26 @@
                 .style("stroke-width",".25")
                 .style("stroke-opacity",".5")
                 .attr("d", path)
+
                 .on("mouseenter",function(e){
-                    if(temForToolTip==1){
-                        return
-                    }
                     let getTheDtName = d3.select(this).data()[0].properties.TOWNNAME;
                     let getTheDtPrice = parseInt(d3.select(this).data()[0].properties.HOUSEPRICE);
-                    svg.append("g").attr("id","tooltip").html(`
+                    svg.append("g")
+                    .style("border",function(d){console.log(e)})
+                    .attr("id","tooltip").html(`
                     <rect rx="4" x="${e.x}" y="${e.y}" width="100" height="75" style="fill:darkblue;"></rect>
-                    <text font-weight="bold" style="fill:white;">
-                        <tspan x="${e.x+20}" y="${e.y+35}">${getTheDtName}</tspan>
-                        <tspan x="${e.x+20}" y="${e.y+55}">${getTheDtPrice}元</tspan>
-                        <tspan x="${e.x+45}" y="${e.y+70}" style="font-size:10px;">Avg:NT$/m²</tspan>
-                    </text>
+                        <text font-weight="bold" style="fill:white;">
+                            <tspan x="${e.x+20}" y="${e.y+35}">${getTheDtName}</tspan>
+                            <tspan x="${e.x+20}" y="${e.y+55}">${getTheDtPrice}元</tspan>
+                            <tspan x="${e.x+45}" y="${e.y+70}" style="font-size:10px;">Avg:NT$/m²</tspan>
+                        </text>
                     `)
-                    temForToolTip=1;
                 })
                 .on("mouseleave",function(e){
                     svg.select("#tooltip").remove();
-                    temForToolTip=0;
-                  ;
                 })
                 .transition().delay((d,i)=>(i*100))
                 .style("fill",d=>(redGreen(d.properties.HOUSEPRICE)))
-               
-                ;
             });
         })
     </script>
